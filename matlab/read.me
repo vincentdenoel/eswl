@@ -1,0 +1,134 @@
+This is the Matlab code use to produce the figures in the paper :
+
+V. Denoël, Quantifying Complexity in the Envelope Reconstruction Problem: review, comparison and a detailed illustration,
+ 	Journal of Wind Engineering & Industrial Aerodynamics, 2024
+
+Thank you for referencing this paper if you found this information useful.
+
+This material has been keynote-presented in Florence during the 16th International Conference on Wind Engineering.
+
+The code is organized in three main blocks.
+
+# --------------------------- #
+# 			BLOCK 0		 	  #
+# --------------------------- #
+
+Block 0 is designed for performing a buffeting analysis on a structural model subjected to wind loads.
+
+- Initialization
+- The addpath function adds custom toolsets and data directories to the MATLAB search path. These are required for 
+  structural and stochastic dynamics.
+- Load Finite Element Model:
+    The load finite_element_model command loads pre-existing structural data and matrices. These include stiffness (K),
+    mass (M), and damping (C) matrices, along with other structural details like node coordinates, element connectivity,
+    degrees of freedom (DOFs), and observed DOFs.
+- Conditional Buffeting Analysis:
+    The redo_analysis flag determines if the buffeting analysis should be re-run.
+    If redo_analysis is set to 1, the following steps occur:
+      Wind Model Definition: Key parameters for the wind model are defined, including wind speed, turbulence intensity,
+      and length scales.
+      Aero-Structural Model Definition: The aerodynamic and structural properties of the system (e.g., deck width, 
+      drag coefficient, and damping ratios) are specified.
+      Buffeting Analysis: The do_buffeting_analysis function is called to compute the system's response to wind loads.
+    The results are stored in SimResults.mat if the analysis is re-done.
+	Notice that the existing SimResults.mat file might be erased.
+
+Overall, this script sets up the model and, if needed, re-computes the Equivalent Static Wind Load (ESWL),
+based on updated wind and structural parameters.
+
+
+# --------------------------- #
+# 			BLOCK 1		 	  #
+# --------------------------- #
+
+
+Block 1 performs structural and stochastic dynamic analyses using pre-computed simulation results of block 0.
+
+
+- Initialization (Color settings are configured using cmp = get(groot,'DefaultAxesColorOrder');.)
+- Loading Simulation Results:
+    The results from a previous simulation are loaded (load SimResults.mat).
+    Variables stored within the structure results are extracted and stored in the workspace for easier access
+    using a loop over the field names. See descriptions below for more information on variables used.
+- Plotting some Power Spectral Density (PSD):
+	  The code selects a few observed Degrees of Freedom (DOFs) from the structural model (iDOF_obs = 
+	  structuralModel.iDOF_obs([2 4 6]);).
+	  It plots the PSD of displacements for specific spans (2nd, 4th, 6th) using plotTF.
+- Covariance Plotting (CPT) Modes:
+	  The eigenvectors of the nodal covariance matrix (Vf) are computed.
+	  The first seven eigenmodes are plotted, showcasing the structural modes of the system.
+- Equivalent Static Wind Loads (ESWL):
+	  For selected modes, the ESWLs are computed and plotted (plot_diagrams) based on the computed eigenmodes
+	  and the observed DOFs. These loads represent the static forces equivalent to the dynamic effects of wind.
+- Load-Response Correlation (LRC) Analysis:
+	  The code computes the Load-Response Correlation (LRC) by calculating the correlation between the response
+	  and aerodynamic drag forces. It reconstructs the displacements (x_reconstruct) and scales the results appropriately.
+	  Both time-domain and frequency-domain methods are used to compute and plot the LRC.
+- Envelope Calculation and Comparison:
+	  The maximum envelope of displacements (x_env) and moments (m_env) is calculated to represent the extreme response.
+      The code defines a metric to quantify the accuracy of the envelope reconstruction and plots the convergence rates.
+- Convergence Plots (reconstruction rates):
+	  Three different approaches (PSWL, naive, and fastest descent) are used to compute the convergence of the envelope 
+	  reconstruction rate. For each approach, the reconstruction rate is plotted, showing how well the computed
+	  displacements and moments match the target results.
+
+Overall, this script carries out complex structural dynamic analyses, focusing on computing and visualizing the dynamic response of the system under wind loads. It utilizes precomputed simulation results, extracts key information, and compares different reconstruction approaches for the dynamic behavior of the structure.
+
+# --------------------------- #
+# 			BLOCK 2		 	  #
+# --------------------------- #
+
+Block 2 performs and displays the convergence plots involving PSWL.
+
+- Initialization
+- Loops over combinations of trial runs (14 combinations), where random coefficients are generated and tested for each.
+- Reconstruction Process:
+    For each trial, you're generating coefficients for trial_eswl, running the plot_diagrams function (likely generating
+	plots of some structural response), and calculating reconstruction rates based on environment limits.
+    The best trial is selected based on a reconstruction rate and the coefficients and results are stored.
+- Plotting and Visualization:
+    Subplots (figure(100)) are used to display results for each combination of trials, including the environment bounds
+	and the maximum values from your target results (ESWLresults.z_max). Another plot is created to visualize 
+	reconstruction rates.
+- Final Visualization:
+    We also end by contour plotting of weighted combinations of w1 and w2 values, related to scale and the computed 
+	reconstruction rates, with proper scaling based on the weights.
+
+
+# --------------------------- #
+# 		  VARIABLES  	 	  #
+# --------------------------- #
+
+ Simulation results are ready for the user. They include:
+ - drag_forces [65536 x 85] : drag forces at the nodes of the FE model
+ - ESWLresults [struct]     : containing the results of the ESWL analysis
+   for 255 structural responses (displacements and bending moments)
+   Fields :
+   * mean_z : average responses [255 x 1]
+   * std_z  : standard deviations of responses [255 x 1]
+   * std_zb : background contribution to std_z [255 x 1]
+   * std_zr : resonant   contribution to std_z [255 x 1]
+   * z      : time history of structural responses [255 x 65536]
+   * wght_b : weighting for the background part [1 x 255]
+   * wght_r : weighting for the resonant   part [1 x 255]
+   * z_min  : minimum responses [255 x 1]
+   * z_max  : maximum responses [255 x 1]
+   * z_rec  : reconstructed responses (for each ESWL) [255 x 255]
+   * ESWL_m : mean forces [85 x 1]
+   * eswl_b : ESWL for the background component of the response (for each ESWL) [85 x 255]
+   * ESWL_b : same as eswl_b, but weighted by the weighting factor wght_b [85 x 255 x 3]
+   * ESWL_r : weighted ESWL for the resonant component of the response (for each ESWL) [85 x 255 x 3]
+   * ESWL   :
+ - modalInfo   [struct]     : contains modal information
+   Fields :
+   * z_x    : displacements and rotations at the nodes of the FEM, for
+              each mode [7 x 170]
+   * z_m    : bending moments [7 x 85]
+   * z      : concatenation of the previous two fields [7 x 255]
+   * freq, mgen, kgen: natural frequencies, modal masses and modal
+              stiffnesses [7 x 1]
+   * damp   : damping ratios (percentage of critical) [7 x 1]
+   * mode   : mode shapes : displacement (x,y,z) at each node, for each
+              mode [85 x 3 x 7]
+   * mil    : modal inertial loads, in each direction (x,y,z), at each
+              node, and for each mode [85 x 3 x 7]
